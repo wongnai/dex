@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	storagesigner "github.com/dexidp/dex/signer/storage"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -216,6 +217,22 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	s = storage.WithStaticConnectors(s, storageConnectors)
 
+	if c.Signer.Type == "" {
+		c.Signer.Type = "storage"
+		c.Signer.Config = &storagesigner.Config{}
+		logger.Info("config no signer, using storage")
+	}
+
+	// inject storage into storagesigner if active
+	if storageConfig, ok := c.Signer.Config.(*storagesigner.Config); ok {
+		storageConfig.Storage = s
+	}
+
+	signer, err := c.Signer.Config.Open(logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize signer: %v", err)
+	}
+
 	if len(c.OAuth2.ResponseTypes) > 0 {
 		logger.Infof("config response types accepted: %s", c.OAuth2.ResponseTypes)
 	}
@@ -240,6 +257,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		AllowedOrigins:         c.Web.AllowedOrigins,
 		Issuer:                 c.Issuer,
 		Storage:                s,
+		Signer:                 signer,
 		Web:                    c.Frontend,
 		Logger:                 logger,
 		Now:                    now,

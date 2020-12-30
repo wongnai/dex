@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/dexidp/dex/signer"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/felixge/httpsnoop"
@@ -59,6 +59,7 @@ type Config struct {
 
 	// The backing persistence layer.
 	Storage storage.Storage
+	Signer  signer.Signer
 
 	// Valid values are "code" to enable the code flow and "token" to enable the implicit
 	// flow. If no response types are supplied this value defaults to "code".
@@ -140,6 +141,7 @@ type Server struct {
 	connectors map[string]Connector
 
 	storage storage.Storage
+	signer  signer.Signer
 
 	mux http.Handler
 
@@ -225,7 +227,8 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	s := &Server{
 		issuerURL:              *issuerURL,
 		connectors:             make(map[string]Connector),
-		storage:                newKeyCacher(c.Storage, now),
+		storage:                c.Storage,
+		signer:                 c.Signer,
 		supportedResponseTypes: supported,
 		idTokensValidFor:       value(c.IDTokensValidFor, 24*time.Hour),
 		authRequestsValidFor:   value(c.AuthRequestsValidFor, 24*time.Hour),
@@ -428,38 +431,6 @@ func (db passwordDB) Refresh(ctx context.Context, s connector.Scopes, identity c
 
 func (db passwordDB) Prompt() string {
 	return "Email Address"
-}
-
-// newKeyCacher returns a storage which caches keys so long as the next
-func newKeyCacher(s storage.Storage, now func() time.Time) storage.Storage {
-	if now == nil {
-		now = time.Now
-	}
-	return &keyCacher{Storage: s, now: now}
-}
-
-type keyCacher struct {
-	storage.Storage
-
-	now  func() time.Time
-	keys atomic.Value // Always holds nil or type *storage.Keys.
-}
-
-func (k *keyCacher) GetKeys() (storage.Keys, error) {
-	keys, ok := k.keys.Load().(*storage.Keys)
-	if ok && keys != nil && k.now().Before(keys.NextRotation) {
-		return *keys, nil
-	}
-
-	storageKeys, err := k.Storage.GetKeys()
-	if err != nil {
-		return storageKeys, err
-	}
-
-	if k.now().Before(storageKeys.NextRotation) {
-		k.keys.Store(&storageKeys)
-	}
-	return storageKeys, nil
 }
 
 func (s *Server) startGarbageCollection(ctx context.Context, frequency time.Duration, now func() time.Time) {

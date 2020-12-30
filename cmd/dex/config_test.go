@@ -25,6 +25,9 @@ func TestValidConfiguration(t *testing.T) {
 				File: "examples/dex.db",
 			},
 		},
+		Signer: Signer{
+			Type: "storage",
+		},
 		Web: Web{
 			HTTP: "127.0.0.1:5556",
 		},
@@ -70,6 +73,8 @@ storage:
     maxIdleConns: 3
     connMaxLifetime: 30
     connectionTimeout: 3
+signer:
+  type: storage
 web:
   http: 127.0.0.1:5556
 
@@ -139,6 +144,9 @@ logger:
 					ConnectionTimeout: 3,
 				},
 			},
+		},
+		Signer: Signer{
+			Type: "storage",
 		},
 		Web: Web{
 			HTTP: "127.0.0.1:5556",
