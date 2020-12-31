@@ -69,19 +69,18 @@ func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
 }
 
 func (s *Signer) Sign(payload []byte) (string, error) {
-	// XXX: This has race condition, if key is rotated between info and sign calls
-	// Nothing we can do about it as the key ID is protected
 	info, err := s.getKeyInfo()
 	if err != nil {
 		return "", err
 	}
 	algo := info.Type
+	latestKeyVersion := info.LatestVersion()
 
 	signedPayloadBuf := new(bytes.Buffer)
 
 	header := map[jose.HeaderKey]string{
 		"alg": string(sigAlgoMapping[algo]),
-		"kid": strconv.Itoa(info.LatestVersion()),
+		"kid": strconv.Itoa(latestKeyVersion),
 	}
 	headerJson, err := json.Marshal(header)
 	if err != nil {
@@ -115,6 +114,7 @@ func (s *Signer) Sign(payload []byte) (string, error) {
 		"prehashed":            "true",
 		"signature_algorithm":  "pkcs1v15",
 		"marshaling_algorithm": "jws",
+		"key_version":          latestKeyVersion,
 	})
 	if err != nil {
 		return "", err
