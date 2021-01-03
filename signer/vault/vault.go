@@ -6,51 +6,65 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/coreos/go-oidc"
 	"github.com/dexidp/dex/pkg/log"
 	"github.com/dexidp/dex/signer"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/mapstructure"
+	"golang.org/x/sync/singleflight"
 	"gopkg.in/square/go-jose.v2"
 	"hash"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type Signer struct {
 	vault  *vault.Client
 	config Config
 	logger log.Logger
+	keySet vaultKeySet
 
-	keyAlgo     string
-	keyAlgoOnce sync.Once
+	keyAlgo      string
+	singleflight singleflight.Group
 }
 
-func (s *Signer) getKeyAlgo() string {
-	s.keyAlgoOnce.Do(func() {
-		s.logger.Info("vault: getting key info")
-		info, err := s.getKeyInfo()
-		if err != nil {
-			s.logger.Info("vault: fail to fetch key info")
-			panic(err)
-		}
-		s.keyAlgo = info.Type
-	})
-	return s.keyAlgo
+func (s *Signer) init() error {
+	s.logger.Info("vault: getting key info")
+	info, err := s.getKeyInfo()
+	if err != nil {
+		return err
+	}
+	s.keyAlgo = info.Type
+	s.keySet = vaultKeySet{
+		signer:    s,
+		cachedJwk: make(map[string]jose.JSONWebKey),
+	}
+	return nil
 }
 
 func (s *Signer) getKeyInfo() (keyInfo, error) {
-	data, err := s.vault.Logical().Read(fmt.Sprintf("%s/keys/%s", s.config.TransitMount, s.config.KeyName))
-	var info keyInfo
-	if err = mapstructure.Decode(data.Data, &info); err != nil {
+	info, err, _ := s.singleflight.Do("keyInfo", func() (interface{}, error) {
+		data, err := s.vault.Logical().Read(fmt.Sprintf("%s/keys/%s", s.config.TransitMount, s.config.KeyName))
+		if err != nil {
+			return nil, err
+		}
+
+		var info keyInfo
+		if err = mapstructure.Decode(data.Data, &info); err != nil {
+			return keyInfo{}, err
+		}
+		return info, nil
+	})
+
+	if err != nil {
 		return keyInfo{}, err
 	}
 
-	return info, nil
+	return info.(keyInfo), nil
 }
 
 func (s *Signer) Hasher() (hash.Hash, error) {
-	return signer.HashForSigAlgorithm(sigAlgoMapping[s.getKeyAlgo()])
+	return signer.HashForSigAlgorithm(sigAlgoMapping[s.keyAlgo])
 }
 
 func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
@@ -58,7 +72,7 @@ func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
 	if err != nil {
 		return signer.SigningKeyResponse{}, err
 	}
-	jwks, err := s.keyInfoToJwks(keys)
+	jwks, err := keyInfoToJwks(keys)
 	if err != nil {
 		return signer.SigningKeyResponse{}, err
 	}
@@ -66,6 +80,10 @@ func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
 	return signer.SigningKeyResponse{
 		Jwks: jwks,
 	}, nil
+}
+
+func (s *Signer) GetKeySet() (oidc.KeySet, error) {
+	return &s.keySet, nil
 }
 
 func (s *Signer) Sign(payload []byte) (string, error) {

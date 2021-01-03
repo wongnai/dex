@@ -3,16 +3,20 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"github.com/coreos/go-oidc"
 	"github.com/dexidp/dex/pkg/log"
 	"github.com/dexidp/dex/signer"
 	"github.com/dexidp/dex/storage"
 	"gopkg.in/square/go-jose.v2"
 	"hash"
+	"time"
 )
 
 type Signer struct {
-	storage storage.Storage
-	logger  log.Logger
+	storage          storage.KeyStorage
+	logger           log.Logger
+	now              func() time.Time
+	rotationStrategy rotationStrategy
 }
 
 func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
@@ -75,4 +79,10 @@ func (s *Signer) Sign(payload []byte) (jws string, err error) {
 		return "", fmt.Errorf("signing payload: %v", err)
 	}
 	return signature.CompactSerialize()
+}
+
+func (s *Signer) GetKeySet() (oidc.KeySet, error) {
+	return &storageKeySet{
+		KeyStorage: s.storage,
+	}, nil
 }

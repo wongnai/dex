@@ -1192,6 +1192,12 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request, clie
 func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	const prefix = "Bearer "
 
+	keySet, err := s.signer.GetKeySet()
+	if err != nil {
+		s.tokenErrHelper(w, errServerError, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	auth := r.Header.Get("authorization")
 	if len(auth) < len(prefix) || !strings.EqualFold(prefix, auth[:len(prefix)]) {
 		w.Header().Set("WWW-Authenticate", "Bearer")
@@ -1200,7 +1206,7 @@ func (s *Server) handleUserInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	rawIDToken := auth[len(prefix):]
 
-	verifier := oidc.NewVerifier(s.issuerURL.String(), &storageKeySet{s.storage}, &oidc.Config{SkipClientIDCheck: true})
+	verifier := oidc.NewVerifier(s.issuerURL.String(), keySet, &oidc.Config{SkipClientIDCheck: true})
 	idToken, err := verifier.Verify(r.Context(), rawIDToken)
 	if err != nil {
 		s.tokenErrHelper(w, errAccessDenied, err.Error(), http.StatusForbidden)

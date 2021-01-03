@@ -16,20 +16,20 @@ var logger = &logrus.Logger{
 }
 
 type storageWithKeysTrigger struct {
-	storage.Storage
+	storage.KeyStorage
 	f func()
 }
 
 func (s storageWithKeysTrigger) GetKeys() (storage.Keys, error) {
 	s.f()
-	return s.Storage.GetKeys()
+	return s.KeyStorage.GetKeys()
 }
 
 func TestKeyCacher(t *testing.T) {
 	tNow := time.Now()
 	now := func() time.Time { return tNow }
 
-	s := memory.New(logger)
+	s := memory.New(logger).(storage.KeyStorage)
 
 	tests := []struct {
 		before            func()

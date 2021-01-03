@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -239,7 +240,7 @@ type Signer struct {
 }
 
 type SignerConfig interface {
-	Open(logger log.Logger) (signer.Signer, error)
+	Open(logger log.Logger, tokenValid time.Duration, rotationPeriod time.Duration) (signer.Signer, error)
 }
 
 var signers = map[string]func() SignerConfig{

@@ -7,15 +7,15 @@ import (
 )
 
 // newKeyCacher returns a storage which caches keys so long as the next
-func newKeyCacher(s storage.Storage, now func() time.Time) storage.Storage {
+func newKeyCacher(s storage.KeyStorage, now func() time.Time) storage.KeyStorage {
 	if now == nil {
 		now = time.Now
 	}
-	return &keyCacher{Storage: s, now: now}
+	return &keyCacher{KeyStorage: s, now: now}
 }
 
 type keyCacher struct {
-	storage.Storage
+	storage.KeyStorage
 
 	now  func() time.Time
 	keys atomic.Value // Always holds nil or type *storage.Keys.
@@ -27,7 +27,7 @@ func (k *keyCacher) GetKeys() (storage.Keys, error) {
 		return *keys, nil
 	}
 
-	storageKeys, err := k.Storage.GetKeys()
+	storageKeys, err := k.KeyStorage.GetKeys()
 	if err != nil {
 		return storageKeys, err
 	}

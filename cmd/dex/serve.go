@@ -152,6 +152,7 @@ func serve(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize storage: %v", err)
 	}
 	logger.Infof("config storage: %s", c.Storage.Type)
+	baseStorage := s
 
 	if len(c.StaticClients) > 0 {
 		for i, client := range c.StaticClients {
@@ -217,22 +218,6 @@ func serve(cmd *cobra.Command, args []string) error {
 
 	s = storage.WithStaticConnectors(s, storageConnectors)
 
-	if c.Signer.Type == "" {
-		c.Signer.Type = "storage"
-		c.Signer.Config = &storagesigner.Config{}
-		logger.Info("config no signer, using storage")
-	}
-
-	// inject storage into storagesigner if active
-	if storageConfig, ok := c.Signer.Config.(*storagesigner.Config); ok {
-		storageConfig.Storage = s
-	}
-
-	signer, err := c.Signer.Config.Open(logger)
-	if err != nil {
-		return fmt.Errorf("failed to initialize signer: %v", err)
-	}
-
 	if len(c.OAuth2.ResponseTypes) > 0 {
 		logger.Infof("config response types accepted: %s", c.OAuth2.ResponseTypes)
 	}
@@ -257,11 +242,14 @@ func serve(cmd *cobra.Command, args []string) error {
 		AllowedOrigins:         c.Web.AllowedOrigins,
 		Issuer:                 c.Issuer,
 		Storage:                s,
-		Signer:                 signer,
 		Web:                    c.Frontend,
 		Logger:                 logger,
 		Now:                    now,
 		PrometheusRegistry:     prometheusRegistry,
+		RotateKeysAfter:        6 * time.Hour,
+		IDTokensValidFor:       24 * time.Hour,
+		AuthRequestsValidFor:   24 * time.Hour,
+		DeviceRequestsValidFor: 5 * time.Minute,
 	}
 	if c.Expiry.SigningKeys != "" {
 		signingKeys, err := time.ParseDuration(c.Expiry.SigningKeys)
@@ -295,6 +283,28 @@ func serve(cmd *cobra.Command, args []string) error {
 		logger.Infof("config device requests valid for: %v", deviceRequests)
 		serverConfig.DeviceRequestsValidFor = deviceRequests
 	}
+
+	if c.Signer.Type == "" {
+		c.Signer.Type = "storage"
+		c.Signer.Config = &storagesigner.Config{}
+		logger.Info("config no signer, using storage")
+	}
+
+	// inject storage into storagesigner if active
+	if storageConfig, ok := c.Signer.Config.(*storagesigner.Config); ok {
+		keyStorage, ok := baseStorage.(storage.KeyStorage)
+		if !ok {
+			return errors.New("storage signer was configured, but the storage engine does not support key storage")
+		}
+		storageConfig.Storage = keyStorage
+	}
+
+	signer, err := c.Signer.Config.Open(logger, serverConfig.IDTokensValidFor, serverConfig.RotateKeysAfter)
+	if err != nil {
+		return fmt.Errorf("failed to initialize signer: %v", err)
+	}
+	serverConfig.Signer = signer
+
 	serv, err := server.NewServer(context.Background(), serverConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize server: %v", err)

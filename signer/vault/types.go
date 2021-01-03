@@ -38,13 +38,22 @@ type keyVersionInfo struct {
 	PublicKey    string `mapstructure:"public_key"`
 }
 
-func (k keyVersionInfo) GetPublicKeyEd25519() (ed25519.PublicKey, error) {
+func (k keyVersionInfo) getPublicKeyEd25519() (ed25519.PublicKey, error) {
 	return base64.StdEncoding.DecodeString(k.PublicKey)
 }
 
-func (k keyVersionInfo) GetPublicKeyPkix() (interface{}, error) {
+func (k keyVersionInfo) getPublicKeyPkix() (interface{}, error) {
 	block, _ := pem.Decode([]byte(k.PublicKey))
 	return x509.ParsePKIXPublicKey(block.Bytes)
+}
+
+func (k keyVersionInfo) GetPublicKey(keyType string) (interface{}, error) {
+	switch keyType {
+	case "ed25519":
+		return k.getPublicKeyEd25519()
+	default:
+		return k.getPublicKeyPkix()
+	}
 }
 
 // sigAlgoMapping contains mapping from Vault key types (https://www.vaultproject.io/docs/secrets/transit#key-types)
@@ -70,33 +79,12 @@ var sigHashMapping = map[string]string{
 	"rsa-4096":   "sha2-512",
 }
 
-func (s *Signer) keyInfoToJwks(info keyInfo) (jose.JSONWebKeySet, error) {
-	var err error
-	algo, ok := sigAlgoMapping[info.Type]
-	if !ok {
-		return jose.JSONWebKeySet{}, fmt.Errorf("unsupported algorithm %s", info.Type)
-	}
-
+func keyInfoToJwks(info keyInfo) (jose.JSONWebKeySet, error) {
 	out := jose.JSONWebKeySet{}
 	for keyId, value := range info.Versions {
-		var pubkey interface{}
-
-		switch info.Type {
-		case "ed25519":
-			pubkey, err = value.GetPublicKeyEd25519()
-		default:
-			pubkey, err = value.GetPublicKeyPkix()
-		}
+		key, err := keyVersionToJwk(info.Type, keyId, value)
 		if err != nil {
-			s.logger.Warnf("unable to parse key %s: %s", keyId, err.Error())
-			continue
-		}
-
-		key := jose.JSONWebKey{
-			Key:       pubkey,
-			KeyID:     keyId,
-			Algorithm: string(algo),
-			Use:       "sig",
+			return jose.JSONWebKeySet{}, fmt.Errorf("cannot parse key version %s: %w", keyId, err)
 		}
 		out.Keys = append(out.Keys, key)
 	}
@@ -106,4 +94,23 @@ func (s *Signer) keyInfoToJwks(info keyInfo) (jose.JSONWebKeySet, error) {
 	}
 
 	return out, nil
+}
+
+func keyVersionToJwk(keyType string, keyId string, version keyVersionInfo) (jose.JSONWebKey, error) {
+	algo, ok := sigAlgoMapping[keyType]
+	if !ok {
+		return jose.JSONWebKey{}, fmt.Errorf("unsupported algorithm %s", keyType)
+	}
+
+	pubkey, err := version.GetPublicKey(keyType)
+	if err != nil {
+		return jose.JSONWebKey{}, fmt.Errorf("unable to parse key %s: %w", keyId, err)
+	}
+
+	return jose.JSONWebKey{
+		Key:       pubkey,
+		KeyID:     keyId,
+		Algorithm: string(algo),
+		Use:       "sig",
+	}, nil
 }

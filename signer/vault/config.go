@@ -4,6 +4,7 @@ import (
 	"github.com/dexidp/dex/pkg/log"
 	"github.com/dexidp/dex/signer"
 	vault "github.com/hashicorp/vault/api"
+	"time"
 )
 
 type Config struct {
@@ -13,7 +14,7 @@ type Config struct {
 	KeyName      string `json:"key" yaml:"key"`
 }
 
-func (c Config) Open(logger log.Logger) (signer.Signer, error) {
+func (c Config) Open(logger log.Logger, tokenValid time.Duration, rotationPeriod time.Duration) (signer.Signer, error) {
 	client, err := vault.NewClient(&vault.Config{
 		AgentAddress: c.Address,
 	})
@@ -25,7 +26,9 @@ func (c Config) Open(logger log.Logger) (signer.Signer, error) {
 		config: c,
 		logger: logger,
 	}
-	out.getKeyAlgo()
+	if err = out.init(); err != nil {
+		return nil, err
+	}
 
 	return out, nil
 }

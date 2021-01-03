@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -169,20 +168,10 @@ type Server struct {
 
 // NewServer constructs a server from the provided config.
 func NewServer(ctx context.Context, c Config) (*Server, error) {
-	return newServer(ctx, c, defaultRotationStrategy(
-		value(c.RotateKeysAfter, 6*time.Hour),
-		value(c.IDTokensValidFor, 24*time.Hour),
-	))
+	return newServer(ctx, c)
 }
 
-// NewServerWithKey constructs a server from the provided config and a static signing key.
-func NewServerWithKey(ctx context.Context, c Config, privateKey *rsa.PrivateKey) (*Server, error) {
-	return newServer(ctx, c, staticRotationStrategy(
-		privateKey,
-	))
-}
-
-func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy) (*Server, error) {
+func newServer(ctx context.Context, c Config) (*Server, error) {
 	issuerURL, err := url.Parse(c.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("server: can't parse issuer URL")
@@ -346,7 +335,7 @@ func newServer(ctx context.Context, c Config, rotationStrategy rotationStrategy)
 	handlePrefix("/theme", theme)
 	s.mux = r
 
-	s.startKeyRotation(ctx, rotationStrategy, now)
+	s.startKeyRotation(ctx)
 	s.startGarbageCollection(ctx, value(c.GCFrequency, 5*time.Minute), now)
 
 	return s, nil
