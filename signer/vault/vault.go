@@ -76,8 +76,6 @@ func (s *Signer) Sign(payload []byte) (string, error) {
 	algo := info.Type
 	latestKeyVersion := info.LatestVersion()
 
-	signedPayloadBuf := new(bytes.Buffer)
-
 	header := map[jose.HeaderKey]string{
 		"alg": string(sigAlgoMapping[algo]),
 		"kid": strconv.Itoa(latestKeyVersion),
@@ -87,21 +85,16 @@ func (s *Signer) Sign(payload []byte) (string, error) {
 		return "", err
 	}
 
-	b64encoder := base64.NewEncoder(base64.RawURLEncoding, signedPayloadBuf)
-	b64encoder.Write(headerJson)
-	b64encoder.Close()
-
-	signedPayloadBuf.WriteRune('.')
-
-	b64encoder = base64.NewEncoder(base64.RawURLEncoding, signedPayloadBuf)
-	b64encoder.Write(payload)
-	b64encoder.Close()
+	signedPayloadBuf, err := s.buildSignedPayload(headerJson, payload)
+	if err != nil {
+		return "", err
+	}
 
 	hasher, err := s.Hasher()
 	if err != nil {
 		return "", err
 	}
-	hasher.Write(signedPayloadBuf.Bytes())
+	hasher.Write(signedPayloadBuf)
 
 	var hashedPayload []byte
 	hashedPayload = hasher.Sum(hashedPayload)
@@ -126,5 +119,21 @@ func (s *Signer) Sign(payload []byte) (string, error) {
 	}
 	sigParts := strings.SplitN(sig, ":", 3)
 
-	return signedPayloadBuf.String() + "." + sigParts[2], nil
+	return string(signedPayloadBuf) + "." + sigParts[2], nil
+}
+
+func (s *Signer) buildSignedPayload(header []byte, payload []byte) ([]byte, error) {
+	signedPayloadBuf := bytes.Buffer{}
+
+	b64encoder := base64.NewEncoder(base64.RawURLEncoding, &signedPayloadBuf)
+	b64encoder.Write(header)
+	b64encoder.Close()
+
+	signedPayloadBuf.WriteRune('.')
+
+	b64encoder = base64.NewEncoder(base64.RawURLEncoding, &signedPayloadBuf)
+	b64encoder.Write(payload)
+	b64encoder.Close()
+
+	return signedPayloadBuf.Bytes(), nil
 }
