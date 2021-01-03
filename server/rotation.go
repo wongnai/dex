@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"github.com/dexidp/dex/signer"
 	"time"
 )
@@ -13,9 +14,9 @@ import (
 func (s *Server) startKeyRotation(ctx context.Context) {
 	// Try to rotate immediately so properly configured storages will have keys.
 	if err := s.signer.RotateKey(); err != nil {
-		if err == signer.ErrRotationNotSupported {
+		if errors.Is(err, signer.ErrRotationNotSupported) {
 			return
-		} else if err == signer.ErrAlreadyRotated {
+		} else if errors.Is(err, signer.ErrAlreadyRotated) {
 			s.logger.Infof("Key rotation not needed: %v", err)
 		} else {
 			s.logger.Errorf("failed to rotate keys: %v", err)
