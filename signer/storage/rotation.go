@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-// rotationStrategy describes a strategy for generating cryptographic keys, how
+// RotationStrategy describes a strategy for generating cryptographic keys, how
 // often to rotate them, and how long they can validate signatures after rotation.
-type rotationStrategy struct {
+type RotationStrategy struct {
 	// Time between rotations.
 	rotationFrequency time.Duration
 
@@ -27,9 +27,9 @@ type rotationStrategy struct {
 	key func() (*rsa.PrivateKey, error)
 }
 
-// staticRotationStrategy returns a strategy which never rotates keys.
-func staticRotationStrategy(key *rsa.PrivateKey) rotationStrategy {
-	return rotationStrategy{
+// StaticRotationStrategy returns a strategy which never rotates keys.
+func StaticRotationStrategy(key *rsa.PrivateKey) RotationStrategy {
+	return RotationStrategy{
 		// Setting these values to 100 years is easier than having a flag indicating no rotation.
 		rotationFrequency: time.Hour * 8760 * 100,
 		idTokenValidFor:   time.Hour * 8760 * 100,
@@ -37,10 +37,10 @@ func staticRotationStrategy(key *rsa.PrivateKey) rotationStrategy {
 	}
 }
 
-// defaultRotationStrategy returns a strategy which rotates keys every provided period,
+// DefaultRotationStrategy returns a strategy which rotates keys every provided period,
 // holding onto the public parts for some specified amount of time.
-func defaultRotationStrategy(rotationFrequency, idTokenValidFor time.Duration) rotationStrategy {
-	return rotationStrategy{
+func DefaultRotationStrategy(rotationFrequency, idTokenValidFor time.Duration) RotationStrategy {
+	return RotationStrategy{
 		rotationFrequency: rotationFrequency,
 		idTokenValidFor:   idTokenValidFor,
 		key: func() (*rsa.PrivateKey, error) {

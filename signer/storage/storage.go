@@ -16,7 +16,7 @@ type Signer struct {
 	storage          storage.KeyStorage
 	logger           log.Logger
 	now              func() time.Time
-	rotationStrategy rotationStrategy
+	rotationStrategy RotationStrategy
 }
 
 func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {

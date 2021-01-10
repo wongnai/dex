@@ -1,18 +1,16 @@
-package server
+package storage
 
 import (
+	"github.com/dexidp/dex/storage"
+	"github.com/dexidp/dex/storage/memory"
+	"github.com/sirupsen/logrus"
 	"os"
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/sirupsen/logrus"
-
-	"github.com/dexidp/dex/storage"
-	"github.com/dexidp/dex/storage/memory"
 )
 
-func signingKeyID(t *testing.T, s storage.Storage) string {
+func signingKeyID(t *testing.T, s storage.KeyStorage) string {
 	keys, err := s.GetKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -20,7 +18,7 @@ func signingKeyID(t *testing.T, s storage.Storage) string {
 	return keys.SigningKey.KeyID
 }
 
-func verificationKeyIDs(t *testing.T, s storage.Storage) (ids []string) {
+func verificationKeyIDs(t *testing.T, s storage.KeyStorage) (ids []string) {
 	keys, err := s.GetKeys()
 	if err != nil {
 		t.Fatal(err)
@@ -73,28 +71,28 @@ func TestKeyRotator(t *testing.T) {
 		Level:     logrus.DebugLevel,
 	}
 
-	r := &keyRotator{
-		Storage:  memory.New(l),
-		strategy: defaultRotationStrategy(rotationFrequency, validFor),
-		now:      func() time.Time { return now },
-		logger:   l,
+	s := &Signer{
+		storage:          memory.New(l).(storage.KeyStorage),
+		logger:           logger,
+		now:              func() time.Time { return now },
+		rotationStrategy: DefaultRotationStrategy(rotationFrequency, validFor),
 	}
 
 	var expVerificationKeys []string
 
 	for i := 0; i < 10; i++ {
 		now = now.Add(rotationFrequency + delta)
-		if err := r.rotate(); err != nil {
+		if err := s.RotateKey(); err != nil {
 			t.Fatal(err)
 		}
 
-		got := verificationKeyIDs(t, r.Storage)
+		got := verificationKeyIDs(t, s.storage)
 
 		if !slicesEq(expVerificationKeys, got) {
 			t.Errorf("after %d rotation, expected verification keys %q, got %q", i+1, expVerificationKeys, got)
 		}
 
-		expVerificationKeys = append(expVerificationKeys, signingKeyID(t, r.Storage))
+		expVerificationKeys = append(expVerificationKeys, signingKeyID(t, s.storage))
 		if n := len(expVerificationKeys); n > maxVerificationKeys {
 			expVerificationKeys = expVerificationKeys[n-maxVerificationKeys:]
 		}

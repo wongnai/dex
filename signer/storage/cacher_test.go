@@ -3,17 +3,9 @@ package storage
 import (
 	"github.com/dexidp/dex/storage"
 	"github.com/dexidp/dex/storage/memory"
-	"github.com/sirupsen/logrus"
-	"os"
 	"testing"
 	"time"
 )
-
-var logger = &logrus.Logger{
-	Out:       os.Stderr,
-	Formatter: &logrus.TextFormatter{DisableColors: true},
-	Level:     logrus.DebugLevel,
-}
 
 type storageWithKeysTrigger struct {
 	storage.KeyStorage

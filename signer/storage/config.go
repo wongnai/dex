@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	Storage storage.KeyStorage
-	Now     func() time.Time
+	Storage          storage.KeyStorage
+	RotationStrategy RotationStrategy
+	Now              func() time.Time
 }
 
 func (c *Config) Open(logger log.Logger, tokenValid time.Duration, rotationPeriod time.Duration) (signer.Signer, error) {
@@ -18,10 +19,15 @@ func (c *Config) Open(logger log.Logger, tokenValid time.Duration, rotationPerio
 		now = time.Now
 	}
 
+	strategy := c.RotationStrategy
+	if strategy.key == nil {
+		strategy = DefaultRotationStrategy(rotationPeriod, tokenValid)
+	}
+
 	return &Signer{
 		storage:          newKeyCacher(c.Storage, now),
 		logger:           logger,
 		now:              now,
-		rotationStrategy: defaultRotationStrategy(rotationPeriod, tokenValid),
+		rotationStrategy: strategy,
 	}, nil
 }
