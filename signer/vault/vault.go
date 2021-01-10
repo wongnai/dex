@@ -111,21 +111,29 @@ func (s *Signer) Sign(payload []byte) (string, error) {
 		return "", err
 	}
 
-	hasher, err := s.Hasher()
-	if err != nil {
-		return "", err
+	var input string
+	preHashed := true
+	if algo == "ed25519" {
+		// ed25519 does not support prehashing
+		input = base64.StdEncoding.EncodeToString(signedPayloadBuf)
+		preHashed = false
+	} else {
+		hasher, err := s.Hasher()
+		if err != nil {
+			return "", err
+		}
+		hasher.Write(signedPayloadBuf)
+
+		var hashedPayload []byte
+		hashedPayload = hasher.Sum(hashedPayload)
+
+		input = base64.StdEncoding.EncodeToString(hashedPayload)
 	}
-	hasher.Write(signedPayloadBuf)
-
-	var hashedPayload []byte
-	hashedPayload = hasher.Sum(hashedPayload)
-
-	b64Hash := base64.StdEncoding.EncodeToString(hashedPayload)
 
 	res, err := s.vault.Logical().Write(fmt.Sprintf("%s/sign/%s", s.config.TransitMount, s.config.KeyName), map[string]interface{}{
 		"hash_algorithm":       sigHashMapping[algo],
-		"input":                b64Hash,
-		"prehashed":            "true",
+		"input":                input,
+		"prehashed":            preHashed,
 		"signature_algorithm":  "pkcs1v15",
 		"marshaling_algorithm": "jws",
 		"key_version":          latestKeyVersion,

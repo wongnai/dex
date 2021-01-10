@@ -59,13 +59,13 @@ func (k keyVersionInfo) GetPublicKey(keyType string) (interface{}, error) {
 // sigAlgoMapping contains mapping from Vault key types (https://www.vaultproject.io/docs/secrets/transit#key-types)
 // to jose.SignatureAlgorithm
 var sigAlgoMapping = map[string]jose.SignatureAlgorithm{
-	//"ed25519":    jose.EdDSA,
+	"ed25519":    jose.EdDSA,
 	"ecdsa-p256": jose.ES256,
 	"ecdsa-p384": jose.ES384,
 	"ecdsa-p521": jose.ES512,
 	"rsa-2048":   jose.RS256,
-	"rsa-3072":   jose.RS256,
-	"rsa-4096":   jose.RS256,
+	"rsa-3072":   jose.RS384,
+	"rsa-4096":   jose.RS512,
 }
 
 // sigHashMapping must match storage.hashForSigAlgo

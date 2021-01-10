@@ -4,8 +4,14 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"github.com/dexidp/dex/signer"
+	"github.com/dexidp/dex/signer/conformance"
+	"github.com/dexidp/dex/storage"
+	"github.com/dexidp/dex/storage/memory"
 	"github.com/sirupsen/logrus"
 	"os"
+	"testing"
+	"time"
 )
 
 var logger = &logrus.Logger{
@@ -53,3 +59,20 @@ E2qpAoGAZo5Wwwk7q8b1n9n/ACh4LpE+QgbFdlJxlfFLJCKstl37atzS8UewOSZj
 FDWV28nTP9sqbtsmU8Tem2jzMvZ7C/Q0AuDoKELFUpux8shm8wfIhyaPnXUGZoAZ
 Np4vUwMSYV5mopESLWOg3loBxKyLGFtgGKVCjGiQvy6zISQ4fQo=
 -----END RSA PRIVATE KEY-----`)
+
+func TestStorage(t *testing.T) {
+	now := time.Now()
+	nowFunc := func() time.Time { return now }
+
+	conformance.RunTests(t, func() signer.Signer {
+		store := newKeyCacher(memory.New(logger).(storage.KeyStorage), nowFunc)
+		signer := &Signer{
+			storage:          store,
+			logger:           logger,
+			now:              nowFunc,
+			rotationStrategy: StaticRotationStrategy(testKey),
+		}
+		signer.RotateKey()
+		return signer
+	})
+}

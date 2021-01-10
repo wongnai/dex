@@ -1,6 +1,9 @@
 package storage
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rsa"
 	"errors"
 	"fmt"
 	"github.com/coreos/go-oidc"
@@ -48,7 +51,7 @@ func (s *Signer) Hasher() (hash.Hash, error) {
 	if err != nil {
 		return nil, err
 	}
-	sigAlgo, err := signer.SignatureAlgorithm(keys.SigningKey)
+	sigAlgo, err := signatureAlgorithm(keys.SigningKey)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +63,7 @@ func (s *Signer) Sign(payload []byte) (jws string, err error) {
 	if err != nil {
 		return "", err
 	}
-	sigAlgo, err := signer.SignatureAlgorithm(keys.SigningKey)
+	sigAlgo, err := signatureAlgorithm(keys.SigningKey)
 	if err != nil {
 		return "", err
 	}
@@ -85,4 +88,29 @@ func (s *Signer) GetKeySet() (oidc.KeySet, error) {
 	return &storageKeySet{
 		KeyStorage: s.storage,
 	}, nil
+}
+
+// Determine the signature algorithm for a JWT.
+func signatureAlgorithm(jwk *jose.JSONWebKey) (alg jose.SignatureAlgorithm, err error) {
+	if jwk.Key == nil {
+		return alg, errors.New("no signing key")
+	}
+	switch key := jwk.Key.(type) {
+	case *rsa.PrivateKey, *rsa.PublicKey:
+		return jose.RS256, nil
+	case *ecdsa.PrivateKey, *ecdsa.PublicKey:
+		keyCurve := key.(elliptic.Curve)
+		switch keyCurve.Params() {
+		case elliptic.P256().Params():
+			return jose.ES256, nil
+		case elliptic.P384().Params():
+			return jose.ES384, nil
+		case elliptic.P521().Params():
+			return jose.ES512, nil
+		default:
+			return alg, errors.New("unsupported ecdsa curve")
+		}
+	default:
+		return alg, fmt.Errorf("unsupported signing key type %T", key)
+	}
 }
