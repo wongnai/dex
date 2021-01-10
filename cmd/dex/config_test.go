@@ -1,6 +1,7 @@
 package main
 
 import (
+	storagesigner "github.com/dexidp/dex/signer/storage"
 	"os"
 	"testing"
 
@@ -146,7 +147,8 @@ logger:
 			},
 		},
 		Signer: Signer{
-			Type: "storage",
+			Type:   "storage",
+			Config: &storagesigner.Config{},
 		},
 		Web: Web{
 			HTTP: "127.0.0.1:5556",

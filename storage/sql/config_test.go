@@ -78,9 +78,15 @@ func testDB(t *testing.T, o opener, withTransactions bool) {
 	withTimeout(time.Minute*1, func() {
 		conformance.RunTests(t, newStorage)
 	})
+	withTimeout(time.Minute*1, func() {
+		conformance.RunKeyTests(t, newStorage)
+	})
 	if withTransactions {
 		withTimeout(time.Minute*1, func() {
 			conformance.RunTransactionTests(t, newStorage)
+		})
+		withTimeout(time.Minute*1, func() {
+			conformance.RunKeyTransactionTests(t, newStorage)
 		})
 	}
 }

@@ -19,12 +19,9 @@ func (c *Config) Open(logger log.Logger, tokenValid time.Duration, rotationPerio
 	}
 
 	return &Signer{
-		storage: newKeyCacher(c.Storage, now),
-		logger:  logger,
-		now:     now,
-		rotationStrategy: defaultRotationStrategy(
-			6*time.Hour,
-			24*time.Hour,
-		),
+		storage:          newKeyCacher(c.Storage, now),
+		logger:           logger,
+		now:              now,
+		rotationStrategy: defaultRotationStrategy(rotationPeriod, tokenValid),
 	}, nil
 }

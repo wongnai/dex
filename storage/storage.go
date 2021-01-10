@@ -123,13 +123,12 @@ type Storage interface {
 	// GarbageCollect deletes all expired AuthCodes,
 	// AuthRequests, DeviceRequests, and DeviceTokens.
 	GarbageCollect(now time.Time) (GCResult, error)
-
-	GetKeys() (Keys, error)
 }
 
 type KeyStorage interface {
 	GetKeys() (Keys, error)
 	UpdateKeys(updater func(old Keys) (Keys, error)) error
+	Close() error
 }
 
 // Client represents an OAuth2 client.
