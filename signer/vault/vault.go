@@ -48,6 +48,9 @@ func (s *Signer) getKeyInfo() (keyInfo, error) {
 		if err != nil {
 			return nil, err
 		}
+		if data == nil {
+			return nil, errors.New("cannot get key information")
+		}
 
 		var info keyInfo
 		if err = mapstructure.Decode(data.Data, &info); err != nil {
