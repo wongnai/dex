@@ -38,6 +38,8 @@ func NewAPI(s storage.Storage, logger log.Logger) api.DexServer {
 }
 
 type dexAPI struct {
+	api.UnimplementedDexServer
+
 	s      storage.Storage
 	logger log.Logger
 }
@@ -50,7 +52,7 @@ func (d dexAPI) CreateClient(ctx context.Context, req *api.CreateClientReq) (*ap
 	if req.Client.Id == "" {
 		req.Client.Id = storage.NewID()
 	}
-	if req.Client.Secret == "" {
+	if req.Client.Secret == "" && !req.Client.Public {
 		req.Client.Secret = storage.NewID() + storage.NewID()
 	}
 
@@ -233,7 +235,7 @@ func (d dexAPI) ListPasswords(ctx context.Context, req *api.ListPasswordReq) (*a
 		return nil, fmt.Errorf("list passwords: %v", err)
 	}
 
-	var passwords []*api.Password
+	passwords := make([]*api.Password, 0, len(passwordList))
 	for _, password := range passwordList {
 		p := api.Password{
 			Email:    password.Email,
@@ -286,20 +288,18 @@ func (d dexAPI) ListRefresh(ctx context.Context, req *api.ListRefreshReq) (*api.
 		return nil, err
 	}
 
-	var refreshTokenRefs []*api.RefreshTokenRef
 	offlineSessions, err := d.s.GetOfflineSessions(id.UserId, id.ConnId)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			// This means that this user-client pair does not have a refresh token yet.
 			// An empty list should be returned instead of an error.
-			return &api.ListRefreshResp{
-				RefreshTokens: refreshTokenRefs,
-			}, nil
+			return &api.ListRefreshResp{}, nil
 		}
 		d.logger.Errorf("api: failed to list refresh tokens %t here : %v", err == storage.ErrNotFound, err)
 		return nil, err
 	}
 
+	refreshTokenRefs := make([]*api.RefreshTokenRef, 0, len(offlineSessions.Refresh))
 	for _, session := range offlineSessions.Refresh {
 		r := api.RefreshTokenRef{
 			Id:        session.ID,

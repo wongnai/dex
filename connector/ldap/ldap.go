@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"net"
 
-	"gopkg.in/ldap.v2"
+	"github.com/go-ldap/ldap/v3"
 
 	"github.com/dexidp/dex/connector"
 	"github.com/dexidp/dex/pkg/log"
@@ -609,7 +609,7 @@ func (c *ldapConnector) groups(ctx context.Context, user ldap.Entry) ([]string, 
 		}
 	}
 
-	var groupNames []string
+	groupNames := make([]string, 0, len(groups))
 	for _, group := range groups {
 		name := getAttr(*group, c.GroupSearch.NameAttr)
 		if name == "" {
