@@ -230,7 +230,7 @@ func (s *Server) newIDToken(clientID string, claims storage.Claims, scopes []str
 	}
 
 	if code != "" {
-		cHash, err := accessTokenHash(signingAlg, code)
+		cHash, err := s.accessTokenHash(code)
 		if err != nil {
 			s.logger.Errorf("error computing c_hash: %v", err)
 			return "", expiry, fmt.Errorf("error computing c_hash: #{err}")

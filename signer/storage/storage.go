@@ -22,6 +22,16 @@ type Signer struct {
 	rotationStrategy RotationStrategy
 }
 
+func New(storage storage.KeyStorage, logger log.Logger, strategy RotationStrategy) *Signer {
+	now := time.Now
+	return &Signer{
+		storage:          newKeyCacher(storage, now),
+		now:              now,
+		logger:           logger,
+		rotationStrategy: strategy,
+	}
+}
+
 func (s *Signer) GetSigningKeys() (signer.SigningKeyResponse, error) {
 	keys, err := s.storage.GetKeys()
 	if err != nil {
